@@ -1,0 +1,4 @@
+{
+  "desc": "DeepSeek 聊天页",
+  "rules": [{ "action": "allow", "page": "*" }]
+}

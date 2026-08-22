@@ -1,0 +1,8 @@
+{
+  "description": "DeepSeek 微信聊天小程序",
+  "compileType": "miniprogram",
+  "libVersion": "latest",
+  "appid": "touristappid",
+  "projectname": "deepseek-chat",
+  "setting": { "es6": true, "enhance": true, "minified": true, "urlCheck": true }
+}

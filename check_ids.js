@@ -1,0 +1,10 @@
+const fs = require('fs');
+const html = fs.readFileSync('src/shell.html', 'utf8');
+const js = fs.readFileSync('src/app.js', 'utf8');
+const idList = [...html.matchAll(/id="([^"]+)"/g)].map((m) => m[1]);
+const ids = new Set(idList);
+const refs = [...js.matchAll(/\$\('([^']+)'\)/g)].map((m) => m[1]);
+const missing = [...new Set(refs.filter((id) => !ids.has(id)))];
+const duplicates = [...new Set(idList.filter((id, i) => idList.indexOf(id) !== i))];
+console.log(JSON.stringify({ htmlIds: ids.size, jsRefs: new Set(refs).size, missing, duplicates }));
+if (missing.length || duplicates.length) process.exit(1);
