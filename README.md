@@ -1,206 +1,288 @@
-# 量化引擎 v10.0
+**English** · [简体中文](README.zh-CN.md)
 
-深色科技风的单文件量化演练终端 + Windows exe 启动器，界面全中文。
+# Quant Engine v10.0
 
-> ⚠️ **这是一个历史回测与策略演练的教学工具。** 所有绩效数字都由回测引擎在真实历史日线上逐根模拟撮合算出，
-> 但历史回测不代表未来收益，存在过拟合与幸存者偏差。**本工具不构成任何投资建议。**
+A dark, terminal-styled single-file backtesting workbench plus a Windows launcher.
 
-## 交付物
+> ⚠️ **This is a teaching tool for historical backtesting and strategy rehearsal.** Every performance
+> figure is produced by the backtest engine simulating fills bar by bar over real historical daily
+> candles — but historical backtests do not imply future returns, and they carry overfitting and
+> survivorship bias. **This tool does not constitute investment advice.**
 
-| 文件 | 说明 |
+## What you get
+
+| File | Description |
 |---|---|
-| `QUANT_ENGINE_v10.exe` | 双击即用。释放内嵌页面到 `%LOCALAPPDATA%\QuantEngine\` 并用默认浏览器打开 |
-| `QUANT_ENGINE_v10.html` | 单文件版（3.26 MB），ECharts 与标的库已内联，**断网也能跑**，可单独拷走 |
+| `QUANT_ENGINE_v10.exe` | Double-click and go. Extracts the embedded page to `%LOCALAPPDATA%\QuantEngine\` and opens it in your default browser |
+| `QUANT_ENGINE_v10.html` | Single-file build (3.26 MB). ECharts and the instrument universe are inlined, so it **runs offline** and can be copied around on its own |
 
-## 数据边界（务必先读）
+## Data boundaries (read this first)
 
-**不是全球实时同步。** 具体分三种情况：
+**This is not a global real-time feed.** There are three distinct cases:
 
-| 标的类型 | 数据粒度 | 实时性 |
+| Instrument type | Data granularity | Timeliness |
 |---|---|---|
-| 股票 / 场内基金 / 板块 / 指数 | 日线 K 线 | 开「⟳ 实时」后每 15 秒拉一次**快照**（最新价/今开/最高/最低/量），**非逐笔、非 Level-2**；交易时段外不刷新 |
-| 美股（纳斯达克 / 纽交所 / 美交所） | 日线 K 线 | 同样是快照轮询，但**东财转发的美股行情通常延迟约 15 分钟**。交易时段按美东时间判断（北京时间约 21:30 开盘，冬令时 22:30），夏令时自动处理 |
-| 场外基金 | 每日单位净值 | **没有盘中价**。基金净值当天收盘后才算出，**T+1 公布**，所以永远慢一天 |
+| Stocks / listed funds / sectors / indices | Daily candles | With "⟳ Live" enabled, pulls a **snapshot** every 15 seconds (last / open / high / low / volume). **Not tick data, not Level 2.** No refresh outside trading hours |
+| US equities (NASDAQ / NYSE / AMEX) | Daily candles | Also snapshot polling, but **the relayed US quotes are typically delayed by about 15 minutes**. Session times follow US Eastern (roughly 21:30 Beijing time, 22:30 in winter), with DST handled automatically |
+| Off-exchange mutual funds | Daily unit NAV | **No intraday price.** Fund NAV is computed after the close and **published T+1**, so it is always a day behind |
 
-**覆盖范围**：A 股 + 场内基金 + 东财板块 + 境内指数 + 场外基金 + **美股**。没有港股、外汇、加密货币。
-（`中概互联网ETF` 这类是在 A 股上市的 QDII 基金，不是美股本身；美股请在「美股」分类里搜。）
+**Coverage**: A-shares + listed funds + sectors + domestic indices + off-exchange mutual funds +
+**US equities**. No Hong Kong stocks, FX, or crypto. (Things like a China-internet ETF are QDII funds
+listed on the A-share market, not the US securities themselves — search the "US Equities" category
+for those.)
 
-美股数据取自东方财富的同一套接口（`m:105/106/107`），**不经过支付宝或同花顺**——
-那两家的行情走私有协议加签名，抓取需要登录你的账号并绕过风控，这条路本工具不走。
+US data comes from the same upstream endpoints (`m:105/106/107`) — **not** through any brokerage or
+trading-app private API. Those run signed proprietary protocols; scraping them would require logging
+into your account and circumventing anti-abuse controls, and this project does not go down that road.
 
-另外，信号面板里的波动率、综合评分、胜率、赔率、风险、仓位、期望收益，**全部是本地用日线算出来的**，
-不是从任何行情商那里取的现成指标。
+Also, everything on the signal panel — volatility, composite score, win rate, payoff ratio, risk,
+position size, expected return — **is computed locally from daily candles**. None of it is an
+off-the-shelf indicator pulled from a data vendor.
 
-## 概率区间推演（不是预测）
+## Probability interval projection (not a forecast)
 
-点图表右上角「◈ 推演」，会在 K 线右侧画出未来 20 个交易日的分布带：
+Click "◈ Project" at the top right of the chart to draw a distribution band over the next 20 trading
+days to the right of the candles:
 
-- 取最近 120 根日线的对数收益，估计漂移 μ 和波动 σ
-- 按对数正态分布给出 p5 / p25 / p50 / p75 / p95 分位区间（金色带为 90% 区间，虚线为 50% 区间）
-- 蓝线是最近 60 根对数价格的最小二乘回归趋势外推
-- 浮层给出：中位值、50%/90% 区间、上涨概率 `Φ(μ√H/σ)`、年化波动率
+- Estimates drift μ and volatility σ from the log returns of the last 120 daily bars
+- Draws p5 / p25 / p50 / p75 / p95 quantile bands under a log-normal distribution (gold band = 90%
+  interval, dashed = 50% interval)
+- The blue line extrapolates a least-squares trend fitted to the last 60 log prices
+- The tooltip gives: median, 50% / 90% intervals, probability of an advance `Φ(μ√H/σ)`, and
+  annualized volatility
 
-**这不是预测。** 它回答的是"如果未来的波动幅度和过去 120 天差不多，价格大概率散落在哪个范围"，
-对方向的判断完全来自历史漂移的外推——而历史漂移恰恰是最不稳定的部分。区间宽度（波动）比中位值（方向）可信得多。
-不构成任何投资建议。
+**This is not a forecast.** It answers "if future volatility resembles the last 120 days, where is the
+price likely to land" — and its directional component comes entirely from extrapolating historical
+drift, which is precisely the least stable part. The width of the band (volatility) is far more
+trustworthy than its center (direction). Not investment advice.
 
-## 标的库
+## Instrument universe
 
-内置**全市场 49270 个标的**快照（构建时抓取，日期见界面），断网可用：
+A snapshot of the **full market — 49,270 instruments** is built in (captured at build time, date shown
+in the UI) and works offline:
 
-| 分类 | 数量 | 数据形态 |
+| Category | Count | Data form |
 |---|---|---|
-| 场外基金（开放式基金） | 25885 | 单位净值 |
-| **美股**（纳斯达克 / 纽交所 / 美交所） | **13718** | K 线 |
-| 股票（沪深主板 / 创业板 / 科创板 / 北交所） | 5892 | K 线 |
-| 场内基金（ETF / LOF） | 1564 | K 线 |
-| 指数 | 1180 | K 线 |
-| 板块（行业 496 / 概念 504 / 地域 31） | 1031 | K 线 |
+| Off-exchange funds (open-end) | 25,885 | Unit NAV |
+| **US equities** (NASDAQ / NYSE / AMEX) | **13,718** | Candles |
+| Stocks (main boards / ChiNext / STAR / BSE) | 5,892 | Candles |
+| Listed funds (ETF / LOF) | 1,564 | Candles |
+| Indices | 1,180 | Candles |
+| Sectors (496 industry / 504 concept / 31 regional) | 1,031 | Candles |
 
-场内 ETF 也会出现在天天基金的全量清单里，已从「场外基金」中剔除（1564 只），保证两个分类**互不重叠**。
+Listed ETFs also appear in the full open-end fund listing, so they have been removed from the
+"off-exchange funds" category (1,564 of them), guaranteeing the two categories **do not overlap**.
 
-美股支持中文名和代码两种搜法（搜 `英伟达` 或 `NVDA` 都行）。
-但要有个心理准备：这一万三千只里绝大多数是仙股、ADR、杠杆 ETF 和期权收益策略基金——
-搜 `TSLA` 会连 `TYYY`、`TSII` 这类衍生产品一起出来。**能搜到不等于值得买**，
-美股没有涨跌停、退市也快，这一点比 A 股严重得多。
+US equities can be searched by either Chinese name or ticker. But be prepared: the vast majority of
+those 13,718 are penny stocks, ADRs, leveraged ETFs, and option-income strategy funds — searching
+`TSLA` will surface derivatives like `TYYY` and `TSII` alongside it. **Searchable does not mean worth
+buying.** US markets have no daily price limits and delist quickly, which makes this a sharper problem
+than on the A-share side.
 
-标的框上方有 **6 个分类标签：场内基金 / 场外基金 / 股票 / 美股 / 板块 / 指数**，**搜索只在当前分类内进行**，
-不会把基金和股票混在一起（在「股票」分类下搜 `AAPL` 返回 0 条）。默认停在**场内基金**。例如在「场内基金」下搜 `半导体` 只出 15 只相关 ETF；
-搜 `600519`（贵州茅台）返回 0 条——要找股票就先点「股票」标签。
+Above the instrument box are **6 category tabs: Listed Funds / Off-exchange Funds / Stocks / US
+Equities / Sectors / Indices**. **Search runs only within the active category**, so funds and stocks
+never get mixed together (searching `AAPL` under "Stocks" returns 0 results). It defaults to **Listed
+Funds** — searching "semiconductor" there returns just the 15 relevant ETFs, while searching `600519`
+returns 0 results, because finding a stock means clicking the "Stocks" tab first.
 
-搜索支持中文名、代码和**拼音首字母**（如 `hs300`），`↑` `↓` 选择、回车确认；框内留空时显示该分类的常用标的。
-点「更新」可在线重新拉取全市场清单并写入浏览器本地存储（约 12 秒）。
+Search accepts Chinese names, tickers, and **pinyin initials** (e.g. `hs300`). Use `↑` `↓` to select
+and Enter to confirm; leaving the box empty shows the common instruments for that category. "Update"
+re-fetches the full market listing online and writes it to browser local storage (about 12 seconds).
 
-> 提示：新上市的基金历史数据很短（指标需要 60 根日线预热）。载入不足 250 根日线时终端日志会给出警告，
-> 不足 90 根会提示几乎无法回测——挑上市久一些的标的，回测才有参考意义。
+> Note: newly listed funds have very short histories (indicators need 60 bars to warm up). Loading
+> fewer than 250 daily bars produces a warning in the terminal log, and fewer than 90 prompts that
+> backtesting is essentially impossible — pick instruments with longer histories for the results to
+> mean anything.
 
-## 界面
+## Interface
 
-全屏四宫格，顶部有加载进度条动画。配色：黑底 + 红涨绿跌 + 金色强调 + 蓝青点缀，数字全部等宽对齐。
+A full-screen four-pane grid with an animated loading bar across the top. Palette: black background,
+red-up / green-down, gold accents, blue-cyan highlights, all figures in aligned monospace.
 
-- **左上 日线回测图 / 净值走势图** — 场内标的画 K 线 + 20日均线 + 量能柱；场外基金自动切换成**净值走线**，副图改画日涨跌幅。
-  播放 / 暂停 / 重置演练动画（1–15 倍速），底部滑块缩放，另有「⟳ 实时」快照同步与「◈ 推演」概率区间
-- **右上 信号面板** — 波动率、综合评分、胜率、赔率、风险、仓位、单笔期望收益，数字滚动动效；顶栏多空标签随演练进度切换。
-  其中**胜率与赔率是实测值**：在演练位置之前的 250 根里逐根假设买入，看后续先摸到目标还是先破止损，
-  胜率 = 先达目标的比例，赔率 = 平均盈利 ÷ 平均亏损。它们随标的、演练进度、止损/目标输入而变；手动改过则锁定为手动值，换标的后恢复实测
-- **左下 策略引擎** — 标的搜索 + 胜率 / 止损 / 目标 / 赔率 / 手续费；命令按工作流分为三组：
-  **分析**（获取数据、市况策略、10 个策略）、**验证**（做空组、反转组、因子、配置）、
-  **资产**（持仓、情绪、模拟盘、财富、实盘只读）。策略卡片区独立滚动，不再挤压整页布局
-- **右下 终端日志** — 开高低收逐根滚动输出，顶部渐隐遮罩
+- **Top-left — daily backtest chart / NAV curve** — listed instruments get candles + 20-day moving
+  average + volume bars; off-exchange funds automatically switch to a **NAV line** with daily percent
+  change in the subplot. Play / pause / reset the rehearsal animation (1–15× speed), scrub with the
+  bottom slider, plus "⟳ Live" snapshot sync and "◈ Project" probability bands.
+- **Top-right — signal panel** — volatility, composite score, win rate, payoff ratio, risk, position
+  size, and per-trade expected return, with rolling number animations; the long/short tag in the header
+  follows the rehearsal position. **Win rate and payoff ratio are measured, not assumed**: over the 250
+  bars preceding the rehearsal position, each bar is treated as a hypothetical entry and checked to see
+  whether it reached the target or the stop first. Win rate = share that hit target first; payoff ratio
+  = average gain ÷ average loss. They move with the instrument, the rehearsal position, and your
+  stop/target inputs; editing them by hand locks in the manual value, and switching instruments
+  restores the measured one.
+- **Bottom-left — strategy engine** — instrument search plus win rate / stop / target / payoff /
+  commission. Commands are grouped by workflow into three sets: **Analysis** (fetch data, regime
+  strategy, 10 strategies), **Validation** (short set, reversal set, factors, allocation), and
+  **Assets** (holdings, sentiment, paper trading, wealth, live read-only). The strategy card area
+  scrolls independently rather than squeezing the page layout.
+- **Bottom-right — terminal log** — OHLC streamed bar by bar, with a fade mask at the top.
 
-点任意策略卡 → 回测绩效报告弹窗。**报告不只给绩效，还会自动把这条曲线逐层拆解**，见下节。
+Click any strategy card → backtest performance report dialog. **The report doesn't just give
+performance, it automatically dissects the curve layer by layer** — see the next section.
 
-顶部 `?` 按钮可随时打开内置新手指引；完整操作步骤、字段含义和常见问题见 `使用指南.md`。
+The `?` button at the top opens the built-in beginner's guide at any time. Full step-by-step
+instructions, field definitions, and FAQ are in `使用指南.md` (User Guide).
 
-网页右侧的 `对话` 把手用于展开常驻的 **DeepSeek 量化专家**。展开后入口按钮隐藏，使用标题栏的 `▶` 或 `×` 收起；对话栏固定在右侧并占满高度，拖动左边缘可调整宽度。展开时主四宫格、右侧信号面板和终端日志会同步收缩，不会被覆盖。对话栏宽度与多轮对话保存在本机；
-它会随问题读取当前标的、数据日期和信号面板摘要，并可自主调用 Python 后端的公开行情、批量历史风险收益比较、财经新闻、情绪、基金关联、模拟盘和系统状态等只读工具。只有明确询问“我的持仓”时才调用持仓工具。
-凡涉及最新行情、新闻、情绪或标的历史比较，后端会设置首轮数据门禁，强制先调用对应工具再生成回答，避免沿用旧对话里的数字。一次返回多个工具调用时，后端会逐项回传完整结果，不再触发工具序列 400 错误。
-API 密钥始终只保存在 Python 后端。模型没有模拟成交控制权，也没有任何实盘交易执行权限。
+The `Chat` handle on the right edge of the page expands a persistent **DeepSeek quant assistant**.
+Once expanded, the entry button hides; collapse it with `▶` or `×` in the title bar. The chat column
+is pinned right at full height, and dragging its left edge resizes it. While expanded, the main grid,
+signal panel, and terminal log shrink in step rather than being covered. Column width and multi-turn
+history are stored locally.
 
-Agent 内的“综合研判”会自动执行另一条严格流程：确认前端在线行情 → 分批检验 11 个因子 →
-回测全部可用策略并单列样本外超额 → 后端独立访问东方财富/腾讯行情复核截止日与价格 →
-重新抓取并分类当日新闻 → 读取持仓与模拟盘 → 最后才允许 DeepSeek 输出条件化观察动作。
-对话框顶部会单条滚动显示后端真实执行记录，只保留最新状态在当前视野内。行情复核失败、日期不一致、新闻仍有未分类项或量化结果缺失时，
-系统直接停止，不会调用模型补写入场或清仓结论。
+The assistant reads the current instrument, data date, and a signal-panel summary alongside your
+question, and can autonomously call read-only tools on the Python backend: public quotes, batch
+historical risk/return comparison, financial news, sentiment, fund linkage, paper trading, and system
+status. It only calls the holdings tool when you explicitly ask about "my holdings".
 
-## 验证体系：把"看起来能赚钱"逐层剥掉
+For anything involving latest quotes, news, sentiment, or cross-instrument history, the backend
+imposes a first-round data gate that forces the relevant tool call before an answer is generated,
+preventing stale numbers from earlier turns being reused. When multiple tool calls come back at once,
+the backend returns each full result in turn, which eliminates the tool-sequence 400 errors.
 
-这是本工具与 LEAN、QuantDinger 等开源引擎最不同的地方——它们强在执行，这里强在**证伪**。
+**API keys are only ever stored on the Python backend. The model has no control over simulated fills
+and no live-trading execution permissions whatsoever.**
 
-打开任意策略报告，自动运行：
+The agent's "Comprehensive Assessment" runs another strict pipeline: confirm frontend live quotes →
+validate 11 factors in batches → backtest every available strategy with out-of-sample excess broken
+out separately → have the backend independently re-check cutoff dates and prices against upstream
+quote sources → re-fetch and re-classify the day's news → read holdings and the paper account → and
+only then let DeepSeek emit conditional observations. A single scrolling line at the top of the chat
+shows the backend's real execution record, keeping only the latest status in view. If quote
+verification fails, dates disagree, news items remain unclassified, or quantitative results are
+missing, the system stops outright rather than calling the model to fabricate an entry or exit
+conclusion.
 
-| 关卡 | 回答的问题 | 做法 |
+## The validation system: peeling away "looks profitable" layer by layer
+
+This is where the tool differs most from open-source engines like LEAN or QuantDinger — their strength
+is execution, this one's strength is **falsification**.
+
+Open any strategy report and it automatically runs:
+
+| Gate | The question it answers | Method |
 |---|---|---|
-| **风险调整口径** | 值不值得承担 | 夏普 / 卡玛 / 同等回撤等效年化，与买入持有同口径对比 |
-| **① 随机进场基准** | 是不是运气 | 200 组随机进场（相同交易次数与止损止盈），看本策略落在第几百分位。<95 即与随机无异 |
-| **② 样本内 / 样本外** | 是不是只在这段行情灵 | 前 70% 估计、后 30% 检验，判据是**超额**（策略 − 同期买入持有），并用样本内估仓位、样本外验证 |
-| **③ 参数敏感性** | 参数一动就崩吗 | 5×5 网格扫描。因子策略自动改扫其核心参数（持有期 × 分位阈值 + 分位窗口），而非无关的止损/目标 |
-| **④ 跨标的扫描** | 是不是只在这个标的上灵 | 按钮触发，同一规则跑一篮子标的（约 2 秒），统计多少个有正超额 |
+| **Risk-adjusted view** | Is it worth the risk taken | Sharpe / Calmar / drawdown-equivalent annualized return, compared with buy-and-hold on the same basis |
+| **① Random-entry baseline** | Is it just luck | 200 random-entry runs (same trade count, same stop and target); see which percentile the strategy lands in. Below 95 is indistinguishable from random |
+| **② In-sample / out-of-sample** | Does it only work in this stretch of market | Fit on the first 70%, test on the last 30%. The criterion is **excess** (strategy − buy-and-hold over the same period), with position size estimated in-sample and validated out-of-sample |
+| **③ Parameter sensitivity** | Does it collapse when parameters move | A 5×5 grid sweep. Factor strategies automatically sweep their own core parameters (holding period × quantile threshold + quantile window) rather than irrelevant stop/target values |
+| **④ Cross-instrument scan** | Does it only work on this one instrument | Button-triggered; runs the same rules across a basket of instruments (about 2 seconds) and counts how many show positive excess |
 
-另有独立的**「◎ 因子检验」**窗口：11 个因子 × 4 个族，给出 IC(5/10/20日)、ICIR、分段一致性、
-**分层收益 Q1→Q5**，并可一键把因子变成**分位策略**或**选股组合**（组合同样要过随机选股 / 样本内外 / 参数敏感三关）。
+There's also a standalone **"◎ Factor Testing"** window: 11 factors across 4 families, reporting
+IC (5 / 10 / 20-day), ICIR, segment consistency, and **layered returns Q1→Q5**, with one-click
+conversion of a factor into either a **quantile strategy** or a **stock-selection portfolio** (the
+portfolio must clear the same three gates: random selection, in/out-of-sample, and parameter
+sensitivity).
 
-报告右上角「⎘ 导出」把规则、参数、全部检验结论导出为纯文本，内容与页面完全一致。
+"⎘ Export" at the top right of the report writes rules, parameters, and every validation conclusion
+out as plain text, identical to what's on screen.
 
-> **五道关卡的设计原则**：任何新方向的第一个好结果，都应假定它没通过，直到关卡说它通过。
-> 开发过程中有两次"迄今最好的结果"就是这样被自己推翻的（详见 `优化建议报告.md`）。
+> **The design principle behind the five gates**: the first good result in any new direction should be
+> assumed not to have passed, until the gates say it did. Two separate "best results yet" were
+> overturned this way during development (details in `优化建议报告.md`, the optimization report).
 
-## 回测引擎怎么算的
+## How the backtest engine computes
 
-不是随机数，是真回测：
+Not random numbers — a real backtest:
 
-- 28 个策略模板（14 做多 + 7 做空 + 7 反转），跑在均线 / 相对强弱 / 快慢线 / 布林带 / 真实波幅 / 唐奇安通道 / 量能均线之上
-- 信号在第 i 根日线收盘确认，**成交价取第 i+1 根开盘价**（避免用未来数据）
-- **按元计价**：初始资金是一等参数，场内按 **100 股整手**成交，买不起一手直接跳过并计数
-- **真实费用**：佣金 2.5‱ 且**每笔最低 5 元** + 滑点 5‱（双边）+ 印花税 5‱（卖出单边）。
-  场外基金则是申购费 + 按持有天数分档的赎回费（<7天 1.5%｜7-30天 0.75%｜30天-1年 0.5%）
-- **成交可行性**：一字涨停买不进、一字跌停卖不出（主板 ±10%、创业板/科创板 ±20%、北交所 ±30%）；
-  单笔超过当日成交额 1% 时提示真实滑点会更高
-- **美股按美股的规则算**，不是把 A 股参数套上去：**1 股起买**（不是 100 股整手）、**无印花税**、
-  **无涨跌停**、全程**按美元计价**（报告里的资金/费用单位会自动切换）。
-  每笔最低佣金按 **1 美元**计——这是各券商里常见的下限，**偏乐观**，
-  你实际用哪家（IB / 老虎 / 富途各不相同）就把佣金那格改掉再看结论。
-  另外**不含换汇点差**，人民币换汇去买的话真实收益还要再打一道折扣
-- **复权双序列**：收益率用后复权（分红不算亏损、结果可复现），股数与费用用不复权真实市价
-- 退出优先级：止损（固定% 或 **ATR 动态**）→ **跟踪止盈** → 止盈 → 策略离场信号 → 60 交易日到期
-- 仓位来自**半凯利公式** `f* = (p·b − (1−p)) / b`，取一半并封顶 80%；
-  报告里另给"按策略自身样本内胜率估仓、样本外验证"的校正口径
+- 28 strategy templates (14 long + 7 short + 7 reversal) built on moving averages, relative strength,
+  fast/slow lines, Bollinger Bands, ATR, Donchian channels, and volume moving averages
+- Signals confirm at the close of bar *i*, and **fills take the open of bar i+1** (no lookahead)
+- **Priced in currency**: starting capital is a first-class parameter; listed instruments fill in
+  **round lots of 100 shares**, and a bar that can't afford a lot is skipped and counted
+- **Real costs**: 2.5 bp commission with a **5 CNY per-trade minimum** + 5 bp slippage (both sides) +
+  5 bp stamp duty (sell side only). Off-exchange funds instead use a subscription fee plus a
+  holding-period tiered redemption fee (<7 days 1.5% | 7–30 days 0.75% | 30 days–1 year 0.5%)
+- **Fill feasibility**: locked limit-up can't be bought, locked limit-down can't be sold (±10% main
+  boards, ±20% ChiNext / STAR, ±30% BSE); a single order exceeding 1% of the day's turnover triggers a
+  warning that real slippage will be higher
+- **US equities are modeled by US rules**, not A-share parameters bolted on: **1-share minimum** (not
+  100-share lots), **no stamp duty**, **no price limits**, and everything **priced in USD** (the
+  report's capital and fee units switch automatically). The per-trade minimum commission is **1 USD** —
+  a common floor across brokers, and **on the optimistic side**; whichever broker you actually use,
+  change that field and re-read the conclusion. It also **excludes FX conversion spread**, so buying
+  with converted currency takes a further haircut on real returns
+- **Dual adjusted series**: returns use backward-adjusted prices (dividends aren't counted as losses,
+  results are reproducible), while share counts and fees use unadjusted real market prices
+- Exit priority: stop loss (fixed % or **ATR-dynamic**) → **trailing take-profit** → take-profit →
+  strategy exit signal → 60-trading-day expiry
+- Position size comes from the **half-Kelly formula** `f* = (p·b − (1−p)) / b`, halved and capped at
+  80%; the report separately gives a corrected view that "estimates size from the strategy's own
+  in-sample win rate and validates out-of-sample"
 
-**关于"仓位 0%"**：胜率与赔率取实测值后，很多标的在默认参数下凯利公式为负——意思是这套止损/目标在该标的上没有正期望，
-数学结论就是不该下注。此时净值不变，报告的累计收益会自动切换为**满仓口径**并标注说明，以免 `+0.00%` 被误读成"打平"。
-想看有正期望的参数，可以把止损放宽、目标放大再观察。
+**About "position size 0%"**: once win rate and payoff ratio are taken from measured values, many
+instruments produce a negative Kelly result under default parameters — meaning that stop/target
+combination has no positive expectancy on that instrument, and the mathematical conclusion is not to
+bet. Equity stays flat in that case, and the report's cumulative return automatically switches to a
+**fully-invested basis** with a note, so `+0.00%` isn't misread as "broke even". To see parameters with
+positive expectancy, widen the stop and extend the target.
 
-「反向做空」不是把做多信号取反，而是 7 个独立的看跌进场规则（死叉、破位新低、超买回落、上轨滞涨、空头排列、零轴下死叉、放量长阴），按做空方向计算盈亏。
+"Reverse short" is not the long signals inverted — it is 7 independent bearish entry rules (death
+cross, breakdown to new lows, overbought pullback, upper-band stall, bearish alignment, death cross
+below zero, high-volume down bar), with P&L computed in the short direction.
 
-**场外基金的回测差异**：它只有一个单位净值，开=高=低=收、没有成交量。所以依赖阴阳线或量能的 8 个策略
-（布林下轨反弹、恐慌抄底、三连阳启动、量价齐升、跳空缺口延续、20日线回踩企稳、布林上轨滞涨、放量长阴）
-会被自动跳过并在日志里说明，剩余 13 个只用收盘价的策略正常回测，成交价取次日净值（与实际申赎规则一致）。
+**How off-exchange funds differ in backtesting**: they have only a unit NAV — open = high = low =
+close, and no volume. So the 8 strategies that depend on candle bodies or volume (Bollinger lower-band
+bounce, panic bottom-fishing, three-white-soldiers start, price-volume surge, gap continuation, 20-day
+MA retest, Bollinger upper-band stall, high-volume down bar) are skipped automatically with an
+explanation in the log. The remaining 13 close-only strategies backtest normally, filling at the next
+day's NAV (matching actual subscription and redemption rules).
 
-断网或接口失败时自动切换**本地模拟行情引擎**（几何布朗运动 + 趋势/波动状态切换 + 隔夜跳空），
-界面右上角数据源标签会显示「东方财富」还是「本地模拟」。
+If the network or an endpoint fails, it automatically switches to a **local simulated market engine**
+(geometric Brownian motion + trend/volatility regime switching + overnight gaps). The data-source tag
+at the top right shows which is active.
 
-## 到目前为止的检验结果
+## Results so far
 
-诚实记录：**在这个工具上测过的方向，没有一个通过全部关卡。**
+For the record: **not one direction tested on this tool has passed all the gates.**
 
-| 方向 | 结论 |
+| Direction | Conclusion |
 |---|---|
-| 14 个追涨模板 | 跑输买入持有；随机基准多在 50 百分位以下 |
-| 7 个反转模板 | 更差，随机百分位 12%–49% |
-| 因子分位择时 | 扫对参数后 25 格仅 12 格为正，分位窗口一换就转负 |
-| 因子选股组合 | 样本内超额 +10.39%/年 → 样本外 **−25.27%/年** |
+| 14 momentum templates | Underperform buy-and-hold; random baseline mostly below the 50th percentile |
+| 7 reversal templates | Worse — random percentile 12%–49% |
+| Factor quantile timing | After sweeping for the right parameters, only 12 of 25 grid cells positive; change the quantile window and it flips negative |
+| Factor stock-selection portfolio | In-sample excess +10.39%/yr → out-of-sample **−25.27%/yr** |
 
-两条反复出现的规律：
+Two patterns that keep recurring:
 
-1. **在单边上涨行情里，所有"择时 + 轻仓"的策略都必然跑输满仓持有**——
-   择时的价值在降低回撤，不在提高收益。只用"超额收益"评判它们等于选错尺子，
-   所以报告同时给风险调整口径。
-2. **看到 IC 显著，下一步不是写策略，而是先看分层收益**——
-   本工具实测：反转效应只存在于"跌得最惨的 20%"，其余 80% 毫无规律；
-   而常见的均线死叉、破位新低等条件覆盖面远大于此，绝大多数交易落在无效区间。
+1. **In a one-way advancing market, every "timing + reduced exposure" strategy necessarily
+   underperforms staying fully invested** — timing's value is in reducing drawdown, not raising
+   returns. Judging these strategies purely on excess return is using the wrong yardstick, which is why
+   the report also gives the risk-adjusted view.
+2. **Seeing a significant IC, the next step is not to write a strategy — it's to look at layered
+   returns first.** Measured here: the reversal effect exists only in the worst-performing 20%, and the
+   other 80% shows no pattern at all. Meanwhile common conditions like a death cross or a breakdown to
+   new lows cover far more ground than that, so the overwhelming majority of trades land in the
+   ineffective region.
 
-这个结果不好看，但它正是工具该做的事：**在你拿真钱去试之前告诉你**。
+That result doesn't look good, but it is exactly what the tool is for: **telling you before you put
+real money on it.**
 
-### 于是有了另一条路：资产配置
+### Which led to a different route: asset allocation
 
-主面板 `◈ 资产配置`。这个模块**不预测涨跌**，只回答三个能被历史直接验证的问题：
+Main panel, `◈ Asset Allocation`. This module **doesn't predict direction** — it answers three
+questions that history can verify directly:
 
-| 问题 | 实测答案（四只宽基 ETF · 2022-06 → 2026-08 · 含真实费用） |
+| Question | Measured answer (four broad-based ETFs · 2022-06 → 2026-08 · real costs included) |
 |---|---|
-| **买几只？** | 等权 4 只 vs 单只平均：回撤 35.00% vs 36.23%，夏普 0.32 vs 0.27。分散有效，但因为 A 股宽基高度同涨同跌，**只削减了 1.2 个百分点回撤** |
-| **多久调一次？** | 季度再平衡 +7.59%/年、回撤 35.00%；不调仓 +7.33%/年、回撤 34.59%。差别很小，再平衡的主要作用是防止涨得多的那只越占越大 |
-| **分几次买？** | 定投 +20.32%，一次性买在最倒霉那天 −5.75%、最幸运那天 +45.91%。**择时的全部价值是这 51.66 个百分点**；定投拿到其中位数，代价是放弃两端 |
+| **How many to hold?** | Equal-weight 4 vs single-holding average: drawdown 35.00% vs 36.23%, Sharpe 0.32 vs 0.27. Diversification works, but because A-share broad-based indices move together so tightly, it **only cut drawdown by 1.2 percentage points** |
+| **How often to rebalance?** | Quarterly rebalancing +7.59%/yr with 35.00% drawdown; never rebalancing +7.33%/yr with 34.59% drawdown. The difference is small — rebalancing mainly keeps the winner from crowding out everything else |
+| **How many purchases?** | Dollar-cost averaging +20.32%; lump-sum on the unluckiest day −5.75%, on the luckiest day +45.91%. **Timing's entire value is those 51.66 percentage points.** DCA takes the median and gives up both tails |
 
-有效前沿那张散点图的正确读法是**看形状而不是抄最优点**——
-"最大夏普配比"是在已知历史上算出来的，本身就是过拟合，换段时间它就移动了。
-图里真正的信息是：散点云上边缘接近直线，说明这个篮子里多担风险和多拿收益基本是等价交换。
+The right way to read the efficient-frontier scatter plot is to **look at its shape, not copy the
+optimum** — the "max Sharpe allocation" is computed on history already known, which makes it
+overfitting by construction, and it moves when the window moves. The real information in that chart is
+that the upper edge of the scatter cloud is nearly straight, meaning that within this basket, taking
+more risk and getting more return is close to an even trade.
 
-另外一个对小账户很实在的发现：每笔最低 5 元佣金，在每次 2000 元的定投里就是 0.25%，
-一年 12 次约等于白扣 3%。**调高单次金额或降低频率能直接省下这块。**
+One more finding that matters a lot for small accounts: a 5 CNY per-trade minimum commission is 0.25%
+on a 2,000 CNY contribution, and 12 of those a year is roughly 3% burned. **Raising the per-contribution
+amount or lowering the frequency saves that outright.**
 
-## 我的持仓 / 市场每日情绪（需要本机后端）
+## My Holdings / Daily Market Sentiment (requires the local backend)
 
-主面板新增 `◧ 我的持仓` 与 `◐ 市场情绪` 两个按钮。它们依赖 `server/` 下的 Python 后端：
+The main panel adds `◧ My Holdings` and `◐ Market Sentiment`. Both depend on the Python backend under
+`server/`:
 
 ```bash
 cd server
@@ -208,93 +290,131 @@ pip install -r requirements.txt
 uvicorn main:app --host 127.0.0.1 --port 8770
 ```
 
-Windows 直接双击 `QUANT_ENGINE_v10.exe` 会自动启动后端；单独双击 `server/run.bat` 也行。**后端没启动时，这两个窗口显示启动指引，
-终端原有的行情、回测、因子检验、资产配置完全不受影响。**
+On Windows, double-clicking `QUANT_ENGINE_v10.exe` starts the backend automatically; double-clicking
+`server/run.bat` on its own works too. **When the backend isn't running, these two windows show startup
+instructions, and the terminal's existing quotes, backtesting, factor testing, and asset allocation are
+entirely unaffected.**
 
-- **我的持仓**：基金与股票分开录入。基金填写“代码 + 投入金额 + 买入日期”，系统按买入日或
-  之后首个交易日的历史净值换算份额；股票填写“代码 + 股数 + 成本单价”。数据存进本机 SQLite
-  （`server/data/quant.db`），旧版份额/成本记录仍可继续使用。
-  列表支持修改和删除；每只持仓可附加每日、每周、每两周或每月定投计划，每日自动更新已跟踪期数、
-  计划累计金额和下一日期。定投功能只做计划跟踪，**不会自动扣款或下单**。
-  持仓市值、当日盈亏、累计盈亏由前端复用东方财富快照现算；场外基金按最新公布净值（T+1）。
-  实时快照偶发不可达时自动降级到日线收盘价，并在行内标注「收盘价 日期」，不会整行空着。
-- **市场情绪**：抓取 10 个公开源（华尔街见闻 / 东财快讯要闻 / 金十 / 沪深交易所公告 / 东财公告 /
-  CNBC / MarketWatch / SeekingAlpha）。“新闻明细”和“今日总览”已合并为同一页，执行顺序为
-  “① 新闻与总览（抓取并阅读）→ ② 新闻关联 → ③ 对我的持仓”；每条新闻直接显示利好/利空/中性、置信度、关联板块、标的和判断依据。
-  DeepSeek 结构化分类关闭不必要的深度思考，采用 8 条/批、10 批并行并实时显示进度；已阅读新闻不重复消耗模型。
-- **新闻关联**：模型从新闻中提取具体公司与股票代码，再反查 SQLite 中基金披露的十大重仓，
-  形成“新闻 → 股票 → 基金”三级链路。天天基金承担批量覆盖，晨星公开基金页对“我的持仓”基金做交叉核对；
-  同步顺序始终是持仓基金优先，再分批扩展场内 ETF。列表只先绘制股票摘要，点击后才生成新闻和基金明细，避免大量关联记录拖慢页面。
-  后端每日自动轮转 40 只，首次只有持仓数据时前端自动补第一批；“更新基金持仓”按钮每次再推进 60 只。
-  每个比例都同时标注报告期和来源，**它是季报披露的占基金净值比例，不是今日实时仓位**。
+- **My Holdings**: funds and stocks are entered separately. Funds take "code + amount invested +
+  purchase date", and the system converts to units using the historical NAV on that date or the next
+  trading day; stocks take "code + share count + cost per share". Data goes into a local SQLite
+  database (`server/data/quant.db`), and legacy unit/cost records remain usable. The list supports
+  editing and deletion. Each holding can carry a daily, weekly, biweekly, or monthly contribution plan,
+  with tracked periods, cumulative planned amount, and next date updated daily. **The contribution
+  feature only tracks the plan — it never debits an account or places an order.** Holding market value,
+  daily P&L, and cumulative P&L are computed live in the frontend from the same quote snapshots;
+  off-exchange funds use the latest published NAV (T+1). If a live snapshot is briefly unreachable, it
+  degrades to the daily close and marks the row "close, date" rather than leaving it blank.
+- **Market Sentiment**: pulls from 10 public sources (financial newswires, exchange announcements,
+  CNBC, MarketWatch, SeekingAlpha). "News detail" and "today's overview" are now a single page, running
+  in the order "① news and overview (fetch and read) → ② news linkage → ③ impact on my holdings". Each
+  item directly shows bullish / bearish / neutral, confidence, related sectors, related instruments,
+  and the reasoning behind the call. DeepSeek's structured classification disables unnecessary deep
+  reasoning and runs 8 items per batch across 10 parallel batches with live progress; already-read news
+  doesn't consume the model again.
+- **News linkage**: the model extracts specific companies and tickers from the news, then reverse-looks
+  up the top-ten disclosed holdings of funds in SQLite, forming a three-level "news → stock → fund"
+  chain. Bulk coverage comes from the fund data source, with a public fund-research site cross-checking
+  the funds in "My Holdings". Sync order always puts held funds first, then expands to listed ETFs in
+  batches. The list draws only the stock summary up front and generates news and fund detail on click,
+  so large numbers of linkage records don't bog down the page. The backend rotates through 40 per day
+  automatically, and the frontend fills the first batch itself when only holdings data exists;
+  "Update fund holdings" advances another 60 per click. Every percentage is labeled with its reporting
+  period and source — **it is the share of fund NAV as disclosed in the quarterly report, not today's
+  live position.**
 
-> ⚠️ 情绪标注、新闻关联与操作建议都是**基于公开信息的梳理或模型推断，仅供参考，不构成任何投资建议**。
-> 新闻情绪与后续价格之间没有稳定因果关系。详见 `server/README.md`。
+> ⚠️ Sentiment labels, news linkage, and suggested actions are all **organization or model inference
+> based on public information, for reference only, and do not constitute investment advice.** There is
+> no stable causal relationship between news sentiment and subsequent prices. See `server/README.md`.
 
-两个源实测不可用，已保留占位适配器并注明原因：**Reuters**（官方公开 RSS 已下线）、
-**财联社**（公开接口需签名，逆向签名属于绕过反爬，本项目不做）。
+Two sources were found unusable and kept as documented placeholder adapters: **Reuters** (the official
+public RSS was discontinued) and one domestic newswire (its public endpoint requires a signature, and
+reverse-engineering that signature amounts to circumventing anti-scraping controls, which this project
+does not do).
 
-## 模拟盘 / 我的财富（严格使用假钱）
+## Paper trading / My Wealth (fake money, strictly)
 
-主面板新增 `▣ 模拟盘` 与 `◆ 我的财富`。这两个页面使用同一个本地模拟账本，界面始终显示
-“模拟盘，非真实资金”，并且后端没有导入 QMT、券商 SDK 或任何实盘下单接口。
+The main panel adds `▣ Paper Trading` and `◆ My Wealth`. Both use the same local simulated ledger, the
+UI permanently displays "paper trading, not real capital", and the backend contains no brokerage SDK,
+no QMT integration, and no live order interface of any kind.
 
-- **多账户**：可以建立多个独立虚拟账户，初始资金默认 10 万元，也可自行设置；账户之间的现金、持仓、成交和净值完全隔离。
-- **自动信号**：把当日新闻情绪、横截面因子排名和 MA20/MA60 趋势合成为 0-100 分；买入阈值、卖出阈值、三项权重、最大持仓数、单标的与总仓上限均可配置。
-- **安全确认**：安全模式只生成“拟交易清单”，勾选后人工确认才写入模拟成交；模拟自动模式也只自动写本机假钱账本，不会向外部发送委托。
-- **撮合约束**：A 股和场内 ETF 统一采用保守的 T+1 批次锁定；按 100 股/份一手撮合。佣金、最低佣金、滑点和卖出股票印花税均可配置，默认佣金 2.5‱、最低 5 元、滑点 5‱、卖出股票印花税 5‱。
-- **组合控制**：默认最多持有 3 只、单只上限 40%、总仓上限 95%、卖出后冷却 5 天，并支持固定止损与跟踪止盈阈值。
-- **财富分析**：展示总资产、累计收益率、最大回撤、年化夏普，以及各虚拟账户和沪深 300 ETF 基准的归一化曲线；持仓市值和净值由后端每日更新。
+- **Multiple accounts**: create several independent virtual accounts, 100,000 CNY starting capital by
+  default and configurable. Cash, holdings, fills, and NAV are fully isolated between accounts.
+- **Automatic signals**: composites the day's news sentiment, cross-sectional factor ranking, and
+  MA20/MA60 trend into a 0–100 score. Buy threshold, sell threshold, the three weights, maximum
+  holdings, and per-instrument and total exposure caps are all configurable.
+- **Safety confirmation**: safe mode only generates a "proposed trades" list, which is written to
+  simulated fills after you tick and manually confirm. Even simulated auto mode only writes to the
+  local fake-money ledger and never sends an order anywhere.
+- **Fill constraints**: A-shares and listed ETFs use a conservative unified T+1 batch lock, filling in
+  100-share lots. Commission, minimum commission, slippage, and stock sell-side stamp duty are all
+  configurable, defaulting to 2.5 bp commission, 5 CNY minimum, 5 bp slippage, 5 bp sell-side stamp duty.
+- **Portfolio controls**: by default holds at most 3 positions, 40% per-instrument cap, 95% total
+  exposure cap, 5-day cooldown after a sale, plus fixed stop-loss and trailing take-profit thresholds.
+- **Wealth analysis**: shows total assets, cumulative return, maximum drawdown, and annualized Sharpe,
+  along with normalized curves for each virtual account and a CSI 300 ETF benchmark. Holding market
+  value and NAV are updated daily by the backend.
 
-新闻情绪只是复合信号的一部分，未通过因子和趋势阈值时不会单独触发拟买入。所有信号、成交、收益与基准对比都是历史信息和模拟计算，**仅供研究，不构成投资建议**。
-未来实盘接入的隔离架构、风控门禁和验收清单见 `实盘接入设计文档.md`；当前程序不包含可执行的实盘适配器。
+News sentiment is only one component of the composite signal and never triggers a proposed buy on its
+own without also clearing the factor and trend thresholds. All signals, fills, returns, and benchmark
+comparisons are historical information and simulated computation — **for research only, not investment
+advice.** The isolation architecture, risk gates, and acceptance checklist for any future live
+integration are in `实盘接入设计文档.md` (live integration design); the current program contains no
+executable live adapter.
 
-### 实盘数据（只读）与订单意图
+### Live data (read-only) and order intents
 
-资产研究中心新增 `◇ 实盘数据（只读）`。它不是交易接口，只提供两个被锁定的本机数据入口：
+The asset research center adds `◇ Live Data (read-only)`. It is not a trading interface — it provides
+exactly two locked local data entry points:
 
-- 导入券商工程师或只读桥接服务输出的**脱敏 JSON 快照**，显示总资产、现金、可用现金、持仓、委托和成交副本。
-- 把模拟盘中的待确认拟交易转换成 `quant-engine-order-intent/1.0` JSON 数据包，供券商工程师复核字段和风控契约。
+- Import a **redacted JSON snapshot** produced by a brokerage engineer or a read-only bridging service,
+  showing total assets, cash, available cash, holdings, orders, and a copy of fills.
+- Convert pending proposed trades from paper trading into a `quant-engine-order-intent/1.0` JSON
+  package, so a brokerage engineer can review the field set and the risk-control contract.
 
-所有接口固定返回 `execution_enabled: false`；后端不存在提交、撤单或券商登录路由。快照若包含密码、令牌、API Key、私钥等字段会被拒绝，账户只能填写别名。订单意图使用稳定幂等编号，重复生成不会产生第二条数据。
+Every endpoint returns a fixed `execution_enabled: false`; no submit, cancel, or brokerage-login route
+exists in the backend. A snapshot containing password, token, API key, private key, or similar fields
+is rejected, and accounts may only be given aliases. Order intents use stable idempotency IDs, so
+regenerating one never produces a second record.
 
-## 重新构建
+## Rebuilding
 
-需要 Node.js 和 .NET Framework 4.x（Windows 自带 `csc.exe`）。
+Requires Node.js and .NET Framework 4.x (`csc.exe` ships with Windows).
 
 ```bash
 powershell -File "build.ps1"
 ```
 
-连带重新抓取全市场标的库快照（需联网，接口有限流，失败就等几分钟再试）：
+Also re-fetch the full-market instrument snapshot (needs network; the endpoints are rate-limited, so
+wait a few minutes and retry on failure):
 
 ```bash
 powershell -File "build.ps1" -Refresh
 ```
 
-只重建 HTML（不打包 exe）：
+Rebuild only the HTML (no exe packaging):
 
 ```bash
 node build.js
 ```
 
-## 源码结构
+## Source layout
 
 ```
-server/             Python FastAPI 后端（持仓/新闻/基金关联/模拟盘 SQLite 与定时任务）
-server/paper_engine.py 纯本地模拟盘信号、T+1 撮合、费用、持仓与财富曲线
-server/live_data.py 实盘脱敏快照只读存储与不可执行订单意图数据包
-src/shell.html      页面结构 + 全部样式（含 __ECHARTS__ / __UNIVERSE__ / __APP__ 三个内联占位）
-src/app.js          标的库检索、行情获取、指标计算、策略库、回测引擎、图表与动效
-src/universe.json   全市场标的快照（fetch-universe.js 生成，构建时内联）
-src/echarts.min.js  ECharts 5.5.1（构建时内联）
-src/Launcher.cs     WinForms 启动器，HTML 以内嵌资源形式打包
-src/MakeIcon.cs     生成 app.ico
-fetch-universe.js   从东方财富分页抓取全市场标的清单
-build.js            内联打包成单文件 HTML
-build.ps1           一键构建 HTML + 图标 + EXE（-Refresh 可连带刷新标的库）
-使用指南.md         从选标的到模拟盘观察的完整操作说明与风险边界
-实盘接入设计文档.md 交给券商工程师的隔离架构与验收要求（不含实盘下单实现）
+server/              Python FastAPI backend (holdings / news / fund linkage / paper trading SQLite and scheduled jobs)
+server/paper_engine.py  Purely local paper-trading signals, T+1 fills, costs, holdings, and wealth curve
+server/live_data.py  Read-only redacted live-snapshot storage and non-executable order-intent packages
+src/shell.html       Page structure + all styles (with the __ECHARTS__ / __UNIVERSE__ / __APP__ inline placeholders)
+src/app.js           Universe search, quote fetching, indicators, strategy library, backtest engine, charts, animation
+src/universe.json    Full-market instrument snapshot (generated by fetch-universe.js, inlined at build time)
+src/echarts.min.js   ECharts 5.5.1 (inlined at build time)
+src/Launcher.cs      WinForms launcher; the HTML is packed as an embedded resource
+src/MakeIcon.cs      Generates app.ico
+fetch-universe.js    Pages through the upstream API to fetch the full-market instrument listing
+build.js             Inlines everything into a single-file HTML
+build.ps1            One-shot build of HTML + icon + EXE (-Refresh also refreshes the universe)
+使用指南.md          User guide: complete walkthrough from picking an instrument to watching a paper account, plus risk boundaries
+实盘接入设计文档.md  Live integration design: isolation architecture and acceptance requirements for a brokerage engineer (contains no live order implementation)
 ```
 
-构建产物（exe / html）直接输出到项目根目录，重新构建会原地覆盖。
+Build outputs (exe / html) go straight to the project root and are overwritten in place on rebuild.
